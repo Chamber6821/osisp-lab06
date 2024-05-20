@@ -36,7 +36,7 @@ generate:
 
 .PHONY: sort
 sort:
-	make run --no-print-directory TARGET=sort TARGET_ARGS="256 $(shell echo "$$(($(CPU_COUNT) * 2))") $(CPU_COUNT) $(DATA_FILE)"
+	make run --no-print-directory TARGET=sort TARGET_ARGS="$(DATA_FILE) $(shell echo "$$(($(CPU_COUNT) * 2))") $(CPU_COUNT) "
 
 .PHONY: show
 show:

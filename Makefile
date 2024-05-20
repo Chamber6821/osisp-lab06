@@ -8,7 +8,7 @@ BUILD_DIR = build
 DATA_FILE = $(BUILD_DIR)/data.bin
 
 DEBUG_SUFFIX = $(if $(call eq,$(MODE),debug),-debug)
-CFLAGS = -W -Wall -Wextra -Werror -pedantic -Wno-strict-prototypes -std=c11 -Isrc/main/ $(if $(call eq,$(MODE),debug),-ggdb)
+CFLAGS = -W -Wall -Wextra -Werror -pedantic -Wno-strict-prototypes -std=c11 -Isrc/main/ $(if $(call eq,$(MODE),debug),-ggdb) -D_DEFAULT_SOURCE -lm
 CC = gcc $(CFLAGS)
 VALGRIND = valgrind --leak-check=full --show-leak-kinds=all
 GDB = gdb
@@ -26,17 +26,21 @@ executable = $(BUILD_DIR)/$(patsubst %.c,%,$(notdir $(1)))$(DEBUG_SUFFIX)
 .PHONY: all
 all: app
 
+.PHONE: run
+run: $(call target,$(TARGET))
+	$(call target,$(TARGET)) $(TARGET_ARGS)
+
 .PHONY: generate
-generate: $(EXECUTABLES)
-	$(call target,generate) $(DATA_FILE)
+generate:
+	make run --no-print-directory TARGET=generate TARGET_ARGS="$(DATA_FILE)"
 
 .PHONY: sort
-sort: $(EXECUTABLES)
-	$(call target,sort) 256 $(shell echo "$$(($(CPU_COUNT) * 2))") $(CPU_COUNT) $(DATA_FILE)
+sort:
+	make run --no-print-directory TARGET=sort TARGET_ARGS="256 $(shell echo "$$(($(CPU_COUNT) * 2))") $(CPU_COUNT) $(DATA_FILE)"
 
 .PHONY: show
-show: $(EXECUTABLES)
-	$(call target,show) $(DATA_FILE)
+show:
+	make run --no-print-directory TARGET=show TARGET_ARGS="$(DATA_FILE)"
 
 .PHONE: vrun
 vrun: $(EXECUTABLES)

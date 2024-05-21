@@ -16,7 +16,7 @@ struct index {
   struct row rows[];
 };
 
-static const char *row2str(struct row *row) {
+static inline const char *row2str(struct row *row) {
   static char buffer[] = "1900-01-01 12:00:00 #18446744073709551615";
   time_t time = fromMJ(row->date);
   char date[] = "1900-01-01 12:00:00";

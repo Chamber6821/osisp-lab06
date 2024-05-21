@@ -27,12 +27,13 @@ pthread_mutex_t mutex;
 pthread_barrier_t barrier;
 
 int compareRows(const struct row *a, const struct row *b) {
-  return b->date - a->date;
+  return a->date - b->date;
 }
 
 int rowsComparator(const void *a, const void *b) { return compareRows(a, b); }
 
 void sorting() {
+  printf("[%7d]: Sorting\n", gettid());
   struct range *target = ranges.begin;
   while (1) {
     pthread_mutex_lock(&mutex);
@@ -49,6 +50,7 @@ void sorting() {
         sizeof(*target->begin),
         rowsComparator
     );
+    printf("[%7d]: Sorted %p\n", gettid(), (void *)target);
   }
 }
 
@@ -56,20 +58,43 @@ struct row *insert(struct row *begin, struct row *end, struct row *what) {
   struct row *it = begin;
   for (; it != end && compareRows(it, what) < 0; ++it)
     ;
-  memmove(it + 1, it, (end + 1) - it);
+  // printf("BEFORE MOVE\n");
+  // for (int i = 0; i < (end - begin); i++) {
+  //   printf("#%2d %s\n", i, row2str(&begin[i]));
+  // }
+  // printf("IT:   %s\n", row2str(it));
+  // printf("WHAT: %s\n", row2str(what));
+  memmove(it + 1, it, (end - it) * sizeof(*it));
+  // printf("AFTER MOVE\n");
+  // for (int i = 0; i < (end - begin) + 1; i++) {
+  //   printf("#%2d %s\n", i, row2str(&begin[i]));
+  // }
   *it = *what;
   return it;
 }
 
 void mergeRanges(struct range *to, struct range *from) {
+  // printf("TO\n");
+  // for (int i = 0; i < (to->end - to->begin); i++) {
+  //   printf("#%2d %s\n", i, row2str(&to->begin[i]));
+  // }
+  // printf("FROM\n");
+  // for (int i = 0; i < (from->end - from->begin); i++) {
+  //   printf("#%2d %s\n", i, row2str(&from->begin[i]));
+  // }
   struct row *nextPlace = to->begin;
   for (; from->begin != from->end; ++to->end, ++from->begin) {
     struct row copy = *from->begin;
     nextPlace = insert(nextPlace, to->end, &copy);
+    // printf("AFTER INSERT\n");
+    // for (int i = 0; i < (to->end - to->begin) + 1; i++) {
+    //   printf("#%2d %s\n", i, row2str(&to->begin[i]));
+    // }
   }
 }
 
 void merging() {
+  printf("[%7d]: Merging\n", gettid());
   struct range *target = ranges.begin;
   while (1) {
     pthread_mutex_lock(&mutex);
@@ -82,12 +107,19 @@ void merging() {
     pthread_mutex_unlock(&mutex);
     if (target + 1 >= ranges.end) break;
     mergeRanges(&target[0], &target[1]);
+    printf(
+        "[%7d]: Merged %p and %p\n",
+        gettid(),
+        (void *)&target[0],
+        (void *)&target[1]
+    );
   }
 }
 
 void *worker(void *arg) {
   (void)arg;
   sorting();
+  printf("[%7d]: All sorted\n", gettid());
   pthread_barrier_wait(&barrier);
   pthread_barrier_wait(&barrier);
   while (ranges.begin != ranges.end) {
@@ -95,6 +127,7 @@ void *worker(void *arg) {
     pthread_barrier_wait(&barrier);
     pthread_barrier_wait(&barrier);
   }
+  printf("[%7d]: All merged\n", gettid());
   return NULL;
 }
 
@@ -126,7 +159,7 @@ int main(int argc, char **argv) {
       .begin = &index->rows[i * blockSize],
       .end = &index->rows[(i + 1) * blockSize]};
   }
-  rangesBuffer[blockCount - 1].end = &index->rows[index->size - 1];
+  rangesBuffer[blockCount - 1].end = &index->rows[index->size];
 
   ranges.begin = rangesBuffer;
   ranges.end = rangesBuffer + blockCount;
@@ -141,21 +174,25 @@ int main(int argc, char **argv) {
   pthread_barrier_wait(&barrier);
   for (struct range *it = ranges.begin; it != ranges.end; ++it)
     it->accepted = 0;
+  printf("[%7d]: Ranges updated\n", gettid());
   pthread_barrier_wait(&barrier);
 
   while (1) {
     pthread_barrier_wait(&barrier);
     if (ranges.end - ranges.begin <= 1) {
       ranges.begin = ranges.end;
+      printf("[%7d]: Ranges updated\n", gettid());
       pthread_barrier_wait(&barrier);
       break;
     }
-    for (struct range *to = ranges.begin, *from = ranges.begin + 1;
+    for (struct range *to = ranges.begin, *from = ranges.begin;
          from < ranges.end;
-         to += 1, from += 2, ranges.end -= 2)
+         to += 1, from += 2)
       *to = *from;
+    ranges.end -= (ranges.end - ranges.begin) / 2;
     for (struct range *it = ranges.begin; it != ranges.end; ++it)
       it->accepted = 0;
+    printf("[%7d]: Ranges updated\n", gettid());
     pthread_barrier_wait(&barrier);
   }
 

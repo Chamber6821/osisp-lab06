@@ -3,12 +3,15 @@ rwildcard = $(filter-out \ ,$(foreach pattern,$(2),$(wildcard $(1)/$(pattern)))$
 # https://stackoverflow.com/a/7324640/13830772
 eq = $(and $(findstring $(1),$(2)),$(findstring $(2),$(1)))
 
+RWS ?= 1000
+BKS ?= 24
+TDS ?= 12
 CPU_COUNT = $(shell nproc)
 BUILD_DIR = build
 DATA_FILE = $(BUILD_DIR)/data.bin
 
 DEBUG_SUFFIX = $(if $(call eq,$(MODE),debug),-debug)
-CFLAGS = -W -Wall -Wextra -Werror -pedantic -Wno-strict-prototypes -std=c11 -Isrc/main/ $(if $(call eq,$(MODE),debug),-ggdb) -D_DEFAULT_SOURCE -lm
+CFLAGS = -W -Wall -Wextra -Werror -pedantic -Wno-strict-prototypes -std=c11 -Isrc/main/ $(if $(call eq,$(MODE),debug),-ggdb) -D_DEFAULT_SOURCE -D_GNU_SOURCE -lm
 CC = gcc $(CFLAGS)
 VALGRIND = valgrind --leak-check=full --show-leak-kinds=all
 GDB = gdb
@@ -32,11 +35,11 @@ run: $(call target,$(TARGET))
 
 .PHONY: generate
 generate:
-	make run --no-print-directory TARGET=generate TARGET_ARGS="$(DATA_FILE)"
+	make run --no-print-directory TARGET=generate TARGET_ARGS="$(DATA_FILE) $(RWS)"
 
 .PHONY: sort
 sort:
-	make run --no-print-directory TARGET=sort TARGET_ARGS="$(DATA_FILE) $(shell echo "$$(($(CPU_COUNT) * 2))") $(CPU_COUNT) "
+	make run --no-print-directory TARGET=sort TARGET_ARGS="$(DATA_FILE) $(BKS) $(TDS)"
 
 .PHONY: show
 show:
